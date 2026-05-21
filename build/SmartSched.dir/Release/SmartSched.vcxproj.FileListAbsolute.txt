@@ -1,0 +1,2 @@
+C:\Users\barsa\Downloads\SmartSched\build\Release\SDL2.dll
+C:\Users\barsa\Downloads\SmartSched\build\SmartSched.dir\Release\SmartSch.6A4DCBA7.Up2Date

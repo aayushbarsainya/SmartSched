@@ -1,0 +1,10 @@
+^C:\USERS\BARSA\DOWNLOADS\SMARTSCHED\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/barsa/Downloads/SmartSched -BC:/Users/barsa/Downloads/SmartSched/build --check-stamp-file C:/Users/barsa/Downloads/SmartSched/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

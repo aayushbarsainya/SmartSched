@@ -1,0 +1,10 @@
+^C:\USERS\BARSA\DOWNLOADS\SMARTSCHED\BUILD\CMAKEFILES\41DCE2989BF636E476EC6B0D2424F2E5\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/barsa/Downloads/SmartSched -BC:/Users/barsa/Downloads/SmartSched/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/barsa/Downloads/SmartSched/build/SmartSched.slnx
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

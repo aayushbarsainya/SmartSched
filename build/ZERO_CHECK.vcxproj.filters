@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\barsa\Downloads\SmartSched\build\CMakeFiles\41dce2989bf636e476ec6b0d2424f2e5\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{78B14DAE-BC08-38AA-BFBB-82E483C22ADE}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

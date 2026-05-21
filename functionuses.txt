@@ -1,0 +1,104 @@
+SmartSched - Function Inventory and Descriptions
+===============================================
+
+Legend:
+- File: path/to/file
+- For each function: signature — what it does; how it does it (1-2 lines)
+
+File: CMakeLists.txt
+- Project and build configuration — defines C++17 target SmartSched, lists sources, and links SDL2 via vcpkg config package.
+
+File: Scheduler.h
+- struct TimeSlice { int pid, startTime, endTime; } — describes a scheduled CPU segment for a process.
+- struct ScheduleMetrics — holds averageWaitingTime, averageTurnaroundTime, cpuUtilizationPercent, throughput, fairness metrics (Jain over slowdown, averageSlowdown).
+- struct ScheduleResult — algorithmName, timeline, computed metrics, and finalProcesses (with times filled).
+- class IScheduler — interface with run(processes) and name() for all schedulers.
+- class SchedulerBase : IScheduler — abstract base with virtual name(); used for polymorphism across schedulers.
+
+File: Process.h
+- struct Process — encapsulates pid, arrivalTime, burstTime, priority, remainingTime, completionTime, waitingTime, turnaroundTime.
+- Process() — default initializer; zeros fields and remainingTime.
+- Process(int id,int at,int bt,int prio) — initializes a process and remainingTime = burstTime.
+- operator<<(std::ostream&, const Process&) — pretty-prints a process summary; used in logs/metrics.
+
+File: Metrics.h / Metrics.cpp
+- namespace MetricsInternal::finalizeTimes(processes, timeline) — computes completion, turnaround, waiting for each process by reading last endTime per pid; waiting = turnaround - burst; guards negative waiting to zero.
+
+File: Utils.h / Utils.cpp
+- Utils::printGanttChart(timeline) — ASCII Gantt: prints slice PIDs and time ticks; iterates slices to lay out bars and end times.
+- Utils::printMetrics(result) — prints algorithm name, Gantt, average waiting/turnaround, average slowdown, and fairness (Jain).
+- Utils::printComparisonTable(results) — per-process WT/TT table across schedulers; also prints fairness line (Jain) per result.
+- Utils::printComparisonTable(schedulers, results) — overload that prints scheduler-provided names; same layout and fairness line.
+- Utils::computeMetrics(processes, timeline) — clones processes and finalizes times; aggregates averages; computes cpuUtilizationPercent and throughput from timeline density; computes slowdown per process and Jain fairness index.
+- Utils::cloneWithRemaining(processes) — deep copy and set remainingTime = burstTime for each process; ensures schedulers operate on independent state.
+- Utils::recommendScheduler(processes, schedulers, results) — analyzes workload stats (burst ranges, arrivals) and selects best schedulers by averages; prints rationale and insights.
+- Utils::printOverallMatrix(schedulers, results) — compact matrix of average waiting/turnaround per scheduler plus a “best for” column and summary stats.
+
+File: ProcessManager.h / ProcessManager.cpp
+- ProcessManager::addProcess(const Process&) — pushes a process into the private vector.
+- ProcessManager::addProcess(pid, at, bt, pr) — constructs and pushes a process with given fields.
+- ProcessManager::list() const — read-only reference to managed processes.
+- ProcessManager::getClone() const — returns deep copy with remainingTime initialized (via Utils::cloneWithRemaining).
+
+File: TraditionalSchedulers.h / TraditionalSchedulers.cpp
+- FCFS_Scheduler::run(processes) — First-Come First-Served; sorts by arrival, emits full-burst slices in order; computes metrics via Utils::computeMetrics.
+- SJF_Scheduler::run(processes) — Non-preemptive Shortest Job First; maintains a min-heap of ready processes by burst; emits one full slice per pick; computes metrics.
+- RR_Scheduler::RR_Scheduler(timeQuantum) — sets quantum.
+- RR_Scheduler::run(processes) — Round Robin; queue of indices, enqueues arrivals, emits time-quantum slices, requeues unfinished; computes metrics.
+
+File: AISchedulers.h / AISchedulers.cpp
+- QLearningScheduler::QLearningScheduler(maxBurstCategory, trainingEpisodes, alpha, gamma, epsilon) — sets Q-learning parameters.
+- QLearningScheduler::run(processes) — builds discrete state (min burst bucket); trains a small Q-table for episodes using epsilon-greedy; simulates 1-tick decisions to build timeline; computes metrics.
+- QLearningScheduler::getBurstCategory(burst) — maps burst to 0-based bucket within [0, burstCategories-1].
+- NNLiketScheduler::NNLiketScheduler(w1, w2, w3, trainIters) — sets weights and “training” iterations.
+- NNLiketScheduler::run(processes) — tries weight variations; scores ready processes by linear score a*remaining + b*arrival + c*priority; emits 1-tick slices; picks best weights by minimizing avg waiting; computes metrics.
+
+File: RealTaskManager.h / RealTaskManager.cpp
+- RealTasks::measureTaskTime(command) — measures wall time of std::system(command); negative time indicates non-zero exit; used for external commands.
+- RealTasks::renderImageTask(width, height, frames) — creates an SDL window and renders animated gradient frames with trigonometric color math; measures elapsed seconds; used to generate realistic render workloads.
+- RealTasks::saveDataset(filename, processes) — writes “P<pid> <arrival> <burst>” per line; for reuse.
+- RealTasks::loadProcessesFromFile(filename) — reads dataset, rounding burst if fractional to ticks; assigns PIDs if absent; returns vector<Process>.
+
+File: image_tasks/ImageTasks.h / ImageTasks.cpp
+- ImageTasks::renderImageBMP(bmpPath, frames, minScalePct, maxScalePct) — CPU-bound image scaling pipeline using SDL software surfaces: load BMP, repeatedly blit scaled up/down for frames; returns wall time (seconds).
+  How: SDL_LoadBMP + SDL_ConvertSurfaceFormat; in loop, create dst surface at scale, SDL_BlitScaled, then scale back into an intermediate surface to add work.
+
+File: custom_tasks/Tasks.h / Tasks.cpp
+- CustomTasks::kthPrime(k) — returns kth prime; for large k (>=100000) uses sieve with Rosser bound; else incremental primality checks; repeats scaled by k to adjust cost; uses volatile sink to avoid optimization.
+- CustomTasks::fibonacciK(k) — iterative Fibonacci to k; repeats scaled by k; volatile sink prevents optimization.
+- CustomTasks::factorialK(k) — iterative factorial; repeats scaled by k; volatile sink prevents optimization.
+- CustomTasks::kthPalindrome(k) — finds kth palindromic integer by brute-force check; repeats scaled by k; volatile sink prevents optimization.
+- Internal helpers:
+  - repeatsFromK(k) — maps k to a bounded repetition count (smaller k → more repeats; very large k → no repeats).
+  - kthPrimeSieveLarge(k) — sieve-of-Eratosthenes with analytical bound for large k; fallback incremental check if bound insufficient.
+  - isPrime(x), isPalindrome(x) — local helpers for primality and palindrome checks.
+
+File: cpu_stress/CpuStress.h / CpuStress.cpp
+- CpuStress::runCpuTimeline(timeline, msPerTick, singleCore) — replays timeline as CPU busy loops; on Windows, sets process affinity to single core or all cores; returns wall time.
+  How: measures high_resolution_clock; for each slice, busy-waits msPerTick * durationUnits; restores affinity after run.
+- CpuStress::runCpuTimeline(timeline, msPerTick, singleCore, perSwitchOverheadMs) — like above, and injects synthetic overhead whenever PID changes to simulate context switch cost; useful for quantitative comparison.
+- Internal helper: busyForMs(ms) — performs CPU-only work (integer mixing) until a deadline; getAllCoresMask() — builds affinity mask on Windows.
+
+File: Visualization.h / Visualization.cpp
+- Viz::runInteractiveVisualization(schedulers, results, width, height) — opens SDL2 window with stacked Gantt charts for all schedulers; interactive pan/zoom; legend; fairness meter per row.
+  How: draws a global grid, then each scheduler row as colored bars (one per TimeSlice) with alternating band backgrounds; draws small fairness bar based on Jain index; keyboard/mouse handlers adjust origin/scale.
+
+File: Utils.h/Utils.cpp (additional notes)
+- All printing utilities use iostreams with std::setw and std::setprecision for aligned output.
+- computeMetrics uses MetricsInternal::finalizeTimes and computes CPU utilization as busy/makespan and throughput as count/makespan.
+
+File: main.cpp
+- readSampleOrInput() — prompts for number of processes; returns default sample if 0; else collects arrival/burst/priority.
+- main() — interactive entry:
+  - Mode 1: sample data
+  - Mode 2: real render tasks (diverse synthetic renders via RealTasks::renderImageTask; saves dataset)
+  - Mode 3: load dataset from file
+  - Mode 4: custom CPU tasks (kth prime/Fibonacci/factorial/palindrome); times each; maps seconds to ticks; adds to ProcessManager
+  - Mode 5: image render on BMP (ImageTasks::renderImageBMP) repeated; maps seconds to ticks; staggered arrivals
+  - Mode 6: CPU replay to Task Manager (single or compare-all); parameters: msPerTick, core mode, synthetic per-switch overhead; prints slices/context switches/replay seconds
+  - For all modes: constructs schedulers (FCFS, SJF, RR(q=2), Q-Learning, NN-like), runs them, prints metrics/comparison/recommendation/overall matrix, and launches SDL visualization window
+
+File: README2.md
+- Documentation for usage, modes, visualization, fairness metrics, and Task Manager replay scenarios.
+
+

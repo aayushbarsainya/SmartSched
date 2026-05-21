@@ -1,0 +1,11 @@
+C:\Users\barsa\Downloads\SmartSched\main.cpp;C:\Users\barsa\Downloads\SmartSched\build\SmartSched.dir\Release\main.obj
+C:\Users\barsa\Downloads\SmartSched\Utils.cpp;C:\Users\barsa\Downloads\SmartSched\build\SmartSched.dir\Release\Utils.obj
+C:\Users\barsa\Downloads\SmartSched\Metrics.cpp;C:\Users\barsa\Downloads\SmartSched\build\SmartSched.dir\Release\Metrics.obj
+C:\Users\barsa\Downloads\SmartSched\ProcessManager.cpp;C:\Users\barsa\Downloads\SmartSched\build\SmartSched.dir\Release\ProcessManager.obj
+C:\Users\barsa\Downloads\SmartSched\TraditionalSchedulers.cpp;C:\Users\barsa\Downloads\SmartSched\build\SmartSched.dir\Release\TraditionalSchedulers.obj
+C:\Users\barsa\Downloads\SmartSched\AISchedulers.cpp;C:\Users\barsa\Downloads\SmartSched\build\SmartSched.dir\Release\AISchedulers.obj
+C:\Users\barsa\Downloads\SmartSched\RealTaskManager.cpp;C:\Users\barsa\Downloads\SmartSched\build\SmartSched.dir\Release\RealTaskManager.obj
+C:\Users\barsa\Downloads\SmartSched\Visualization.cpp;C:\Users\barsa\Downloads\SmartSched\build\SmartSched.dir\Release\Visualization.obj
+C:\Users\barsa\Downloads\SmartSched\custom_tasks\Tasks.cpp;C:\Users\barsa\Downloads\SmartSched\build\SmartSched.dir\Release\Tasks.obj
+C:\Users\barsa\Downloads\SmartSched\image_tasks\ImageTasks.cpp;C:\Users\barsa\Downloads\SmartSched\build\SmartSched.dir\Release\ImageTasks.obj
+C:\Users\barsa\Downloads\SmartSched\cpu_stress\CpuStress.cpp;C:\Users\barsa\Downloads\SmartSched\build\SmartSched.dir\Release\CpuStress.obj
