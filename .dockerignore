@@ -1,0 +1,6 @@
+build/
+build-*/
+*.exe
+.git/
+.vscode/
+.idea/

@@ -1,10 +1,15 @@
-# Minimal SDL2 finder for Windows and generic setups
+# Minimal SDL2 finder for Windows and Linux setups
 
 find_path(SDL2_INCLUDE_DIR SDL.h
     HINTS
         $ENV{SDL2_DIR}/include
         ${SDL2_DIR}/include
         C:/vcpkg/installed/x64-windows/include
+        /usr/include/SDL2
+        /usr/include
+        /usr/local/include/SDL2
+        /usr/local/include
+    PATH_SUFFIXES SDL2
 )
 
 if (WIN32)
@@ -23,7 +28,13 @@ if (WIN32)
             ${SDL2_DIR}/lib/Release
             C:/vcpkg/installed/x64-windows/lib)
 else()
-    find_library(SDL2_LIBRARY NAMES SDL2)
+    find_library(SDL2_LIBRARY NAMES SDL2
+        HINTS
+            /usr/lib/x86_64-linux-gnu
+            /usr/lib
+            /usr/local/lib
+            /lib/x86_64-linux-gnu
+    )
     set(SDL2MAIN_LIBRARY "")
 endif()
 
@@ -49,6 +60,3 @@ if (SDL2_FOUND)
         )
     endif()
 endif()
-
-
-

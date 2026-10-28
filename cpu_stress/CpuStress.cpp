@@ -2,9 +2,16 @@
 #include <chrono>
 #include <atomic>
 #include <thread>
+#include <fstream>
+#include <sstream>
+#include <iostream>
+
 #ifdef _WIN32
 #define NOMINMAX
 #include <windows.h>
+#else
+#include <sched.h>
+#include <unistd.h>
 #endif
 
 namespace {
@@ -32,10 +39,61 @@ namespace {
         }
         return mask ? mask : 1;
     }
+#else
+    void applyLinuxAffinity(int cpuCore, bool singleCore) {
+        cpu_set_t set;
+        CPU_ZERO(&set);
+        long numCores = sysconf(_SC_NPROCESSORS_ONLN);
+        if (numCores <= 0) numCores = 1;
+
+        if (cpuCore > 0) {
+            CPU_SET(cpuCore % numCores, &set);
+        } else if (singleCore) {
+            int core = (numCores > 1) ? 1 : 0;
+            CPU_SET(core, &set);
+        } else {
+            for (int i = 0; i < numCores; ++i) {
+                CPU_SET(i, &set);
+            }
+        }
+        sched_setaffinity(0, sizeof(cpu_set_t), &set);
+    }
 #endif
 }
 
 namespace CpuStress {
+
+    KernelSchedStats getKernelSchedStats() {
+        KernelSchedStats stats;
+#ifndef _WIN32
+        std::ifstream f("/proc/self/sched");
+        if (f.is_open()) {
+            std::string line;
+            while (std::getline(f, line)) {
+                std::istringstream iss(line);
+                std::string key, colon;
+                if (iss >> key >> colon) {
+                    if (key == "se.sum_exec_runtime") {
+                        iss >> stats.execRuntimeMs;
+                    } else if (key == "nr_switches") {
+                        iss >> stats.totalSwitches;
+                    } else if (key == "nr_voluntary_switches") {
+                        iss >> stats.voluntarySwitches;
+                    } else if (key == "nr_involuntary_switches") {
+                        iss >> stats.involuntarySwitches;
+                    } else if (key == "policy") {
+                        iss >> stats.policy;
+                    } else if (key == "prio") {
+                        iss >> stats.priority;
+                    }
+                }
+            }
+            stats.available = true;
+        }
+#endif
+        return stats;
+    }
+
     double runCpuTimeline(const std::vector<TimeSlice>& timeline, int msPerTick, bool singleCore) {
         if (timeline.empty()) return 0.0;
         if (msPerTick <= 0) msPerTick = 50;
@@ -46,14 +104,15 @@ namespace CpuStress {
         DWORD_PTR systemMask = 0;
         GetProcessAffinityMask(hProc, &originalMask, &systemMask);
         if (singleCore) {
-            // Pin to CPU 1 (not CPU 0) to avoid contention with system tasks
-            // CPU 0 often handles system interrupts and has higher background load
-            DWORD_PTR cpu1 = (1ULL << 1);  // Core 1 instead of Core 0
+            DWORD_PTR cpu1 = (1ULL << 1);
             SetProcessAffinityMask(hProc, cpu1);
         } else {
-            // Allow all cores
             SetProcessAffinityMask(hProc, getAllCoresMask());
         }
+#else
+        cpu_set_t origSet;
+        bool hasOrig = (sched_getaffinity(0, sizeof(cpu_set_t), &origSet) == 0);
+        applyLinuxAffinity(0, singleCore);
 #endif
 
         using namespace std::chrono;
@@ -71,9 +130,12 @@ namespace CpuStress {
         duration<double> diff = t1 - t0;
 
 #ifdef _WIN32
-        // Restore original affinity
         if (originalMask) {
             SetProcessAffinityMask(hProc, originalMask);
+        }
+#else
+        if (hasOrig) {
+            sched_setaffinity(0, sizeof(cpu_set_t), &origSet);
         }
 #endif
         return diff.count();
@@ -90,20 +152,20 @@ namespace CpuStress {
         DWORD_PTR systemMask = 0;
         GetProcessAffinityMask(hProc, &originalMask, &systemMask);
         if (singleCore) {
-            // Pin to CPU 1 (not CPU 0) to avoid contention with system tasks
-            // CPU 0 often handles system interrupts and has higher background load
-            DWORD_PTR cpu1 = (1ULL << 1);  // Core 1 instead of Core 0
+            DWORD_PTR cpu1 = (1ULL << 1);
             SetProcessAffinityMask(hProc, cpu1);
         } else {
-            // Allow all cores
             SetProcessAffinityMask(hProc, getAllCoresMask());
         }
+#else
+        cpu_set_t origSet;
+        bool hasOrig = (sched_getaffinity(0, sizeof(cpu_set_t), &origSet) == 0);
+        applyLinuxAffinity(0, singleCore);
 #endif
 
         using namespace std::chrono;
         auto t0 = high_resolution_clock::now();
 
-        // Replay each slice as active busy time
         int prevPid = timeline.front().pid;
         for (size_t i = 0; i < timeline.size(); ++i) {
             const auto& ts = timeline[i];
@@ -112,7 +174,6 @@ namespace CpuStress {
                 int ms = durationUnits * msPerTick;
                 busyForMs(ms);
             }
-            // Apply synthetic context-switch overhead when PID changes to simulate cache/TLB effects
             if ((int)ts.pid != prevPid) {
                 if (perSwitchOverheadMs > 0) busyForMs(perSwitchOverheadMs);
             }
@@ -123,9 +184,12 @@ namespace CpuStress {
         duration<double> diff = t1 - t0;
 
 #ifdef _WIN32
-        // Restore original affinity
         if (originalMask) {
             SetProcessAffinityMask(hProc, originalMask);
+        }
+#else
+        if (hasOrig) {
+            sched_setaffinity(0, sizeof(cpu_set_t), &origSet);
         }
 #endif
         return diff.count();
@@ -134,7 +198,7 @@ namespace CpuStress {
     double runCpuTimeline(const std::vector<TimeSlice>& timeline, int msPerTick, int cpuCore, int workMultiplier) {
         if (timeline.empty()) return 0.0;
         if (msPerTick <= 0) msPerTick = 100;
-        if (cpuCore < 0 || cpuCore > 6) cpuCore = 0;
+        if (cpuCore < 0 || cpuCore > 64) cpuCore = 0;
         if (workMultiplier <= 0) workMultiplier = 1;
         if (workMultiplier > 10) workMultiplier = 10;
 
@@ -144,24 +208,25 @@ namespace CpuStress {
         DWORD_PTR systemMask = 0;
         GetProcessAffinityMask(hProc, &originalMask, &systemMask);
         
-        if (cpuCore > 0 && cpuCore <= 6) {
-            // Pin to specific core (1-6, not CPU 0)
-            DWORD_PTR coreMask = (1ULL << cpuCore);
+        if (cpuCore > 0) {
+            DWORD_PTR coreMask = (1ULL << (cpuCore % 64));
             SetProcessAffinityMask(hProc, coreMask);
         } else {
-            // Allow all cores
             SetProcessAffinityMask(hProc, getAllCoresMask());
         }
+#else
+        cpu_set_t origSet;
+        bool hasOrig = (sched_getaffinity(0, sizeof(cpu_set_t), &origSet) == 0);
+        applyLinuxAffinity(cpuCore, false);
 #endif
 
         using namespace std::chrono;
         auto t0 = high_resolution_clock::now();
 
-        // Replay each slice as active busy time, with work multiplier
         for (const auto& ts : timeline) {
             int durationUnits = ts.endTime - ts.startTime;
             if (durationUnits <= 0) continue;
-            int ms = durationUnits * msPerTick * workMultiplier;  // Apply multiplier
+            int ms = durationUnits * msPerTick * workMultiplier;
             busyForMs(ms);
         }
 
@@ -169,13 +234,28 @@ namespace CpuStress {
         duration<double> diff = t1 - t0;
 
 #ifdef _WIN32
-        // Restore original affinity
         if (originalMask) {
             SetProcessAffinityMask(hProc, originalMask);
+        }
+#else
+        if (hasOrig) {
+            sched_setaffinity(0, sizeof(cpu_set_t), &origSet);
         }
 #endif
         return diff.count();
     }
+
+    void setThreadAffinity(int cpuCore) {
+#ifdef _WIN32
+        HANDLE hThread = GetCurrentThread();
+        if (cpuCore > 0) {
+            DWORD_PTR mask = (1ULL << (cpuCore % 64));
+            SetThreadAffinityMask(hThread, mask);
+        } else {
+            SetThreadAffinityMask(hThread, getAllCoresMask());
+        }
+#else
+        applyLinuxAffinity(cpuCore, false);
+#endif
+    }
 }
-
-

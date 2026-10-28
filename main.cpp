@@ -7,6 +7,7 @@
 #include "ProcessManager.h"
 #include "RealTaskManager.h"
 #include "Visualization.h"
+#include "AppUI.h"
 #include "custom_tasks/Tasks.h"
 #include <chrono>
 #include "image_tasks/ImageTasks.h"
@@ -39,7 +40,23 @@ static std::vector<Process> readSampleOrInput() {
     return processes;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    // Check if CLI mode was requested
+    bool cliMode = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--cli" || arg == "-c") {
+            cliMode = true;
+            break;
+        }
+    }
+
+    if (!cliMode) {
+        // Run full interactive Graphical User Interface (WSLg / Windows)
+        return AppUI::run();
+    }
+
+    std::cout << "=== SmartSched CLI Mode ===\n";
     std::cout << "Enter 1 for sample data, 2 for real task measurement, 3 to load from file, 4 for custom tasks, 5 for image render (BMP), 6 to replay CPU load: ";
     int mode = 1; std::cin >> mode;
 

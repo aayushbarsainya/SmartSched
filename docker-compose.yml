@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  smartsched:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: smartsched:latest
+    container_name: smartsched-app
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    # Optional: uncomment to allow real-time thread priority changes and core pinning
+    # privileged: true
